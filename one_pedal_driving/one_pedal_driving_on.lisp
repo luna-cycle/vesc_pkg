@@ -134,7 +134,8 @@
          (def Current_commanded( I_command Throttle_normalized setpoint_speed))
          (if (< Current_commanded 0.0) (set-brake-rel Current_commanded)(set-current-rel Current_commanded))
         
-         
+         (if (< speed 0.0)(set-duty 0.0)); avoid undesired duty-cycle when the wheel spin backwards
+
          (sleep time_sleep)
 
     ))
