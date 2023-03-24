@@ -5,22 +5,22 @@
 ;0-Calculate max braking and accel current for the current speed
 ;1-Read throttle(ADC 0);
 ;2-Truncate the throttle to ensure values between 0.0 1.0
-;3-Mapping curve- linear interpolation using regen and current limits 
+;3-Mapping curve- linear interpolation using regen and current limits
 ;4-Applies a curve for throttle (done)
-;5-Aplies a step-ramp from a setpoint to a desired value 
+;5-Aplies a step-ramp from a setpoint to a desired value
 ;6-Set-current value (0.0 1.0) (done)
 
 
 (define speed_start      0.0) ;km/h
 (define speed_max      100.0) ;km/h
 (define throttle_exp     1.2)
-(define Imotor_max     550.0) ; 
+(define Imotor_max     550.0) ;
 (define Imotor_regen_max    -500.0);
-(define Ibatt_max     150.0)
-(define Ibatt_regen_max -40.0)
+(define Ibatt_max         150.0)
+(define Ibatt_regen_max  -16.0)
 (define Iregen_exp_factor  1.0);set to 1 to get a linear current response with the speed
-(define time_sleep       0.01)
-(define speed            0.0)
+(define time_sleep         0.01)
+(define speed              0.0)
 
 (define setpoint_speed  0.0)
 
@@ -49,7 +49,7 @@
 (defun Thr_out_min ( m )
 (progn
     (if (< m 0) (setvar 'mult -3.0) (setvar 'mult 3.0))
-    (* (/ ( Imotor_min_limit m) Imotor_max) (* mult (pow ( abs (/ (- m speed_start) (- speed_max speed_start))) Iregen_exp_factor)))  
+    (* (/ ( Imotor_min_limit m) Imotor_max) (* mult (pow ( abs (/ (- m speed_start) (- speed_max speed_start))) Iregen_exp_factor)))
  ))
 
 (defun Thr_out_max (m)
@@ -60,20 +60,20 @@
 
 (defun I_command (throttle m)
 
-(+ (Thr_out_min m) (* (pow throttle throttle_exp) (- (Thr_out_max m) (Thr_out_min m)))) 
+(+ (Thr_out_min m) (* (pow throttle throttle_exp) (- (Thr_out_max m) (Thr_out_min m))))
 
 )
 
-; Normalize adc throttle readings, interpolation 
+; Normalize adc throttle readings, interpolation
 
 (defun utils_map(x in_min in_max out_min out_max)
-(/ (* (- x in_min) (- out_max out_min)) (+ (- in_max in_min) out_min)) 
+(/ (* (- x in_min) (- out_max out_min)) (+ (- in_max in_min) out_min))
 )
 
 ; truncate throttle readings
 
 (defun utils_truncate ( pwr min max)
- (progn  
+ (progn
   (cond ((> pwr max) (setvar 'Throttle_normalized max))
         ((< pwr min) (setvar 'Throttle_normalized min))
   )
@@ -89,13 +89,13 @@
                 (+ val step)
                 goal
         ))
-        
+
         ((> val goal)
             (if (> (- val step) goal)
                 (- val step)
                 goal
         ))
-        
+
         (t val)
     )
 )
@@ -110,32 +110,20 @@
 )
 
 
-; Current output
 
-;(defun current_forward(setpoint)
- ; (progn
-  ;(set-current-rel setpoint)
-  ;)
-;)
- 
 
 (loopwhile t
     (progn
          (def throttle_volts (get-adc 0))
-         
-         (def throttle_linear_mapping(utils_map throttle_volts 0.56 2.05 0.0 1.0))
+         (def throttle_linear_mapping(utils_map throttle_volts 0.57 2.75 0.0 1.0))
          (setvar 'Throttle_normalized(throttle-curve throttle_linear_mapping 0 0 2))
          (utils_truncate Throttle_normalized 0.0 1.0)
          (setvar 'speed (get-speed))
          (setvar 'speed  (* 3.6 speed)); converts from m/s to Km/hr
          (setvar 'speed (truncate speed 3)); truncate speed value with 3 decimals
          (setvar 'setpoint_speed (step-towards setpoint_speed speed 1.0));
-         
          (def Current_commanded( I_command Throttle_normalized setpoint_speed))
-         (if (< Current_commanded 0.0) (set-brake-rel Current_commanded)(set-current-rel Current_commanded))
-        
-         (if (< speed 0.0)(set-duty 0.0)); avoid undesired duty-cycle when the wheel spin backwards
-
+         (if (< Current_commanded 0.0) (set-brake-rel (abs Current_commanded)) (set-current-rel Current_commanded))
          (sleep time_sleep)
-
-    ))
+    )
+)
