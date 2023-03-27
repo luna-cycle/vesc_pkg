@@ -14,15 +14,21 @@
 (define speed_start      0.0) ;km/h
 (define speed_max      100.0) ;km/h
 (define throttle_exp     1.2)
-(define Imotor_max     550.0) ;
-(define Imotor_regen_max    -500.0);
-(define Ibatt_max         150.0)
-(define Ibatt_regen_max  -16.0)
 (define Iregen_exp_factor  1.0);set to 1 to get a linear current response with the speed
 (define time_sleep         0.01)
 (define speed              0.0)
+(define setpoint_speed      0.0)
+(define I_regen_strength    3.0)
 
-(define setpoint_speed  0.0)
+; update values from mcconfig for OPD algorithm
+
+(defun update_values ()
+(progn
+    (define Imotor_max         (conf-get 'l-current-max))
+    (define Imotor_regen_max   (conf-get 'l-current-min))
+    (define Ibatt_max          (conf-get 'l-in-current-max))
+    (define Ibatt_regen_max    (conf-get 'l-in-current-min))
+))
 
 (conf-set 'app-to-use 0); Set to no APP usage
 
@@ -47,10 +53,8 @@
 ; define throttle outputs range
 
 (defun Thr_out_min ( m )
-(progn
-    (if (< m 0) (setvar 'mult -3.0) (setvar 'mult 3.0))
-    (* (/ ( Imotor_min_limit m) Imotor_max) (* mult (pow ( abs (/ (- m speed_start) (- speed_max speed_start))) Iregen_exp_factor)))
- ))
+ (* (/ ( Imotor_min_limit m) Imotor_max) (* I_regen_strength (/ (- m speed_start) (- speed_max speed_start))))
+ )
 
 (defun Thr_out_max (m)
 (/ ( Imotor_max_limit m) Imotor_max)
@@ -110,17 +114,15 @@
 )
 
 
-
-
 (loopwhile t
     (progn
+         (update_values)
          (def throttle_volts (get-adc 0))
          (def throttle_linear_mapping(utils_map throttle_volts 0.57 2.75 0.0 1.0))
          (setvar 'Throttle_normalized(throttle-curve throttle_linear_mapping 0 0 2))
          (utils_truncate Throttle_normalized 0.0 1.0)
-         (setvar 'speed (get-speed))
-         (setvar 'speed  (* 3.6 speed)); converts from m/s to Km/hr
-         (setvar 'speed (truncate speed 3)); truncate speed value with 3 decimals
+         (setvar 'speed (* 3.6 (get-speed))) ; converts the speed value from m/s to km/hr
+         (setvar 'speed (truncate speed 3))
          (setvar 'setpoint_speed (step-towards setpoint_speed speed 1.0));
          (def Current_commanded( I_command Throttle_normalized setpoint_speed))
          (if (< Current_commanded 0.0) (set-brake-rel (abs Current_commanded)) (set-current-rel Current_commanded))
