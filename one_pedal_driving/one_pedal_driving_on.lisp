@@ -14,7 +14,6 @@
 (define speed_start      0.0) ;km/h
 (define speed_max      100.0) ;km/h
 (define throttle_exp     1.2)
-(define Iregen_exp_factor  1.0);set to 1 to get a linear current response with the speed
 (define time_sleep         0.01)
 (define speed              0.0)
 (define setpoint_speed      0.0)
@@ -105,15 +104,6 @@
 )
 
 
-; define a function to truncate a number with desired decimals
-
-(defun truncate (number decimals)
-
-(- number (/ (- (* number (pow 10 decimals)) (to-i (* number (pow 10 decimals)))) (pow 10 decimals)))
-
-)
-
-
 (loopwhile t
     (progn
          (update_values)
@@ -122,7 +112,6 @@
          (setvar 'Throttle_normalized(throttle-curve throttle_linear_mapping 0 0 2))
          (utils_truncate Throttle_normalized 0.0 1.0)
          (setvar 'speed (* 3.6 (get-speed))) ; converts the speed value from m/s to km/hr
-         (setvar 'speed (truncate speed 3))
          (setvar 'setpoint_speed (step-towards setpoint_speed speed 1.0));
          (def Current_commanded( I_command Throttle_normalized setpoint_speed))
          (if (< Current_commanded 0.0) (set-brake-rel (abs Current_commanded)) (set-current-rel Current_commanded))
