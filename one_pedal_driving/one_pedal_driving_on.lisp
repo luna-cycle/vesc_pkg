@@ -10,7 +10,6 @@
 ;6-Aplies a step-ramp from a setpoint to a desired value
 ;7-Set-current value (0.0 1.0)
 
-(define speed_start      0.0) ; km/h
 (define speed_max      100.0) ; km/h. Set to about max vehicle speed
 (define throttle_exp     1.2) ; De-linearization factor. 1.0 means fully linear
 (define throttle_start  0.57) ; ADC voltage at 0% throttle
@@ -21,6 +20,7 @@
 (define time_sleep      0.01) ; Loop period. Set at 100Hz
 (define speed            0.0) ; Wheel speed
 (define setpoint_speed   0.0) ; Ramped speed
+
 
 ; Update values from mcconfig for OPD algorithm
 
@@ -55,7 +55,7 @@
 ; Define throttle outputs range
 
 (defun Thr_out_min (m)
-(* (/ ( Imotor_min_limit m) Imotor_max) (* I_regen_strength (/ (- m speed_start) (- speed_max speed_start))))
+(* (/ ( Imotor_min_limit m) Imotor_max) (* I_regen_strength (/ m speed_max)))
 )
 
 (defun Thr_out_max (m)
@@ -108,13 +108,19 @@
     (progn
          (update_values)
          (def throttle_volts (get-adc 0))
-         (def throttle_linear_mapping(utils_map throttle_volts throttle_start throttle_end 0.0 1.0))
-         (setvar 'Throttle_normalized(throttle-curve throttle_linear_mapping 0 0 2))
-         (utils_truncate Throttle_normalized 0.0 1.0)
-         (setvar 'speed (* 3.6 (get-speed))) ; converts the speed value from m/s to km/hr
-         (setvar 'setpoint_speed (step-towards setpoint_speed speed 1.0)) ; filter speed signal with a ramp
-         (def Current_commanded( I_command Throttle_normalized setpoint_speed))
+         (if(or (> throttle_volts throttle_max) (< throttle_volts throttle_min) ) 
+           (setvar 'Current_commanded 0.0)
+           (progn
+                (def throttle_linear_mapping(utils_map throttle_volts throttle_start throttle_end 0.0 1.0))
+                (setvar 'Throttle_normalized(throttle-curve throttle_linear_mapping 0 0 2))
+                (utils_truncate Throttle_normalized 0.0 1.0)
+                (setvar 'speed (* 3.6 (get-speed))) ; converts the speed value from m/s to km/hr
+                (setvar 'setpoint_speed (step-towards setpoint_speed speed 1.0)) ; filter speed signal with a ramp
+                (def Current_commanded( I_command Throttle_normalized setpoint_speed))
+           )
+         )
          (if (< Current_commanded 0.0) (set-brake-rel (abs Current_commanded)) (set-current-rel Current_commanded))
          (sleep time_sleep)
     )
-)
+)  
+    
