@@ -16,7 +16,7 @@
 (define throttle_end    2.75) ; ADC voltage at 100% throttle
 (define throttle_min     0.5) ; Min throttle voltage (wiring failure threshold)
 (define throttle_max    2.95) ; Max throttle voltage (wiring failure threshold)
-(define I_regen_strength 3.0) ; This factor increases or decreases the regen braking torque
+(define I_regen_strength 2.0) ; This factor increases or decreases the regen braking torque
 (define time_sleep      0.01) ; Loop period. Set at 100Hz
 (define speed            0.0) ; Wheel speed
 (define setpoint_speed   0.0) ; Ramped speed
@@ -32,7 +32,7 @@
     (define Ibatt_regen_max    (conf-get 'l-in-current-min))
 ))
 
-(conf-set 'app-to-use 0); Set to no APP usage
+(conf-set 'app-to-use 0) ; Disable apps to have full control over the throttle
 
 ; Define maximum regen as a function of speed
 
@@ -74,7 +74,7 @@
 (/ (* (- x in_min) (- out_max out_min)) (+ (- in_max in_min) out_min))
 )
 
-; truncate throttle readings
+; Truncate throttle readings
 
 (defun utils_truncate (pwr min max)
  (progn
